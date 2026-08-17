@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from comandos import executar
 from configuracoes import Configuracao
+from rede import remover_topologia
 
 
 MTU = 9000
@@ -14,6 +15,11 @@ LIMITE_NETEM = 100000
 
 def montar_topologia(configuracao: Configuracao) -> None:
     """Monta uma topologia com um namespace e uma veth por O-RU."""
+    # Defesa idempotente para reinícios e também entre duas configurações.
+    remover_topologia(
+        configuracao.quantidade_rus,
+        titulo="Preparação da topologia",
+    )
     print(f"\n=== Montagem: {configuracao.identificador} ===")
 
     for indice_ru in range(1, configuracao.quantidade_rus + 1):
