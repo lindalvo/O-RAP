@@ -14,6 +14,17 @@ from yamls import DIRETORIO_OUT
 DB_PATH = DIRETORIO_OUT / "metricas.db"
 
 
+def chave_configuracao(
+    configuracao: Configuracao,
+) -> tuple[int, int, float]:
+    """Chave estável usada pelo banco e pela retomada do pipeline."""
+    return (
+        configuracao.quantidade_rus,
+        configuracao.carga_agregada_mhz,
+        round(configuracao.desvio_padrao_mhz, 6),
+    )
+
+
 def _conectar(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conexao = sqlite3.connect(db_path, timeout=30)
@@ -54,8 +65,40 @@ def inicializar_banco(db_path: Path = DB_PATH) -> None:
                 roundtrip,
                 metric
             );
+
             """
         )
+
+
+def carregar_estado_retomada(
+    db_path: Path = DB_PATH,
+) -> tuple[int, set[tuple[int, int, float]]]:
+    """Retorna a maior rodada e suas configurações presentes em ``stats``."""
+    inicializar_banco(db_path)
+    with _conectar(db_path) as conexao:
+        maior_roundtrip = conexao.execute(
+            "SELECT COALESCE(MAX(roundtrip), 0) FROM stats"
+        ).fetchone()[0]
+
+        if maior_roundtrip == 0:
+            return 0, set()
+
+        linhas = conexao.execute(
+            """
+            SELECT num_orus, carga_agregada_mhz, dp_carga_mhz
+            FROM stats
+            WHERE roundtrip = ?
+            GROUP BY num_orus, carga_agregada_mhz, dp_carga_mhz
+            """
+            ,
+            (maior_roundtrip,),
+        ).fetchall()
+
+    configuracoes_presentes = {
+        (int(num_orus), int(carga), round(float(dp), 6))
+        for num_orus, carga, dp in linhas
+    }
+    return int(maior_roundtrip), configuracoes_presentes
 
 
 def gravar_amostras(
@@ -65,11 +108,13 @@ def gravar_amostras(
     db_path: Path = DB_PATH,
 ) -> int:
     """Grava uma coleta completa em uma única transação."""
-    dp_carga_mhz = round(configuracao.desvio_padrao_mhz, 6)
+    num_orus, carga_agregada_mhz, dp_carga_mhz = chave_configuracao(
+        configuracao
+    )
     valores = [
         (
-            configuracao.quantidade_rus,
-            configuracao.carga_agregada_mhz,
+            num_orus,
+            carga_agregada_mhz,
             dp_carga_mhz,
             roundtrip,
             amostra["timestamp_utc"],

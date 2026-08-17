@@ -1,5 +1,6 @@
 """Laço principal do pipeline experimental."""
 
+from banco import carregar_estado_retomada, chave_configuracao
 from coleta import coletar_metricas
 from configuracoes import gerar_configuracoes
 from desmontagem import desmontar_topologia
@@ -10,14 +11,50 @@ from topologia import montar_topologia
 from yamls import gerar_yamls
 
 
-RODADAS = 2
+RODADAS = 20
 
 
 def main() -> None:
     limpar_ambiente_residual()
+    configuracoes = gerar_configuracoes()
+    maior_roundtrip, presentes_na_ultima = carregar_estado_retomada()
+    rodada_inicial = maior_roundtrip if maior_roundtrip > 0 else 1
 
-    for roundtrip in range(1, RODADAS + 1):
-        for configuracao in gerar_configuracoes():
+    if maior_roundtrip > 0:
+        print(
+            f"Retomada: roundtrip={maior_roundtrip}, "
+            f"{len(presentes_na_ultima)} de {len(configuracoes)} "
+            "configuração(ões) já coletada(s).",
+            flush=True,
+        )
+    else:
+        print("Banco sem coletas anteriores; iniciando na rodada 1.")
+
+    for roundtrip in range(rodada_inicial, RODADAS + 1):
+        if roundtrip == maior_roundtrip:
+            pendentes = [
+                configuracao
+                for configuracao in configuracoes
+                if chave_configuracao(configuracao)
+                not in presentes_na_ultima
+            ]
+        else:
+            pendentes = configuracoes
+
+        if not pendentes:
+            print(
+                f"roundtrip={roundtrip} já está completa; ignorando.",
+                flush=True,
+            )
+            continue
+
+        print(
+            f"roundtrip={roundtrip}: {len(pendentes)} de "
+            f"{len(configuracoes)} configuração(ões) pendente(s).",
+            flush=True,
+        )
+
+        for configuracao in pendentes:
             print(
                 f"roundtrip={roundtrip}",
                 configuracao.identificador,
