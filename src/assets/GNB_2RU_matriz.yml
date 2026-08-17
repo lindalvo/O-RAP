@@ -73,7 +73,7 @@ cell_cfg:
 cells:
   - pci: 0
     sector_id: 0
-    dl_arfcn: 62500
+    dl_arfcn: 625000
     channel_bandwidth_MHz: __RU1BW__
     prach:
       prach_root_sequence_index: 1
