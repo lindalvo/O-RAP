@@ -1,5 +1,7 @@
 """Laço principal do pipeline experimental."""
 
+from random import SystemRandom
+
 from banco import carregar_estado_retomada, chave_configuracao
 from coleta import coletar_metricas
 from configuracoes import gerar_configuracoes
@@ -11,7 +13,8 @@ from topologia import montar_topologia
 from yamls import gerar_yamls
 
 
-RODADAS = 20
+RODADAS = 10
+GERADOR_ALEATORIO = SystemRandom()
 
 
 def main() -> None:
@@ -39,7 +42,7 @@ def main() -> None:
                 not in presentes_na_ultima
             ]
         else:
-            pendentes = configuracoes
+            pendentes = list(configuracoes)
 
         if not pendentes:
             print(
@@ -54,6 +57,12 @@ def main() -> None:
             flush=True,
         )
 
+        GERADOR_ALEATORIO.shuffle(pendentes)
+        print(
+            f"roundtrip={roundtrip}: ordem das configurações embaralhada.",
+            flush=True,
+        )
+
         for configuracao in pendentes:
             print(
                 f"roundtrip={roundtrip}",
@@ -61,7 +70,7 @@ def main() -> None:
                 configuracao.larguras_mhz,
             )
 
-            arquivos = gerar_yamls(configuracao)
+            arquivos = gerar_yamls(configuracao, roundtrip)
             processos = None
             try:
                 montar_topologia(configuracao)

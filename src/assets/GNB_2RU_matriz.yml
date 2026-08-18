@@ -102,7 +102,7 @@ remote_control:
 test_mode:
   test_ue:
     rnti: 0x44
-    nof_ues: 8
+    nof_ues: 7
     ue_creation_stagger_slots: 100
     ri: 1
     cqi: 7
@@ -118,10 +118,10 @@ expert_execution:
   threads:
     upper_phy:
       pdsch_processor_type: flexible
-      pdsch_cb_batch_length: 4
-      max_pucch_concurrency: 1
-      max_pusch_and_srs_concurrency: 1
-      max_pdsch_concurrency: 3
+      pdsch_cb_batch_length: 2
+      max_pucch_concurrency: 2
+      max_pusch_and_srs_concurrency: 2
+      max_pdsch_concurrency: 2
     lower_phy:
       execution_profile: dual
 

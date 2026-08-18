@@ -43,12 +43,17 @@ def _renderizar(
 
 def gerar_yamls(
     configuracao: Configuracao,
+    roundtrip: int,
     diretorio_assets: Path = DIRETORIO_ASSETS,
     diretorio_out: Path = DIRETORIO_OUT,
 ) -> ArquivosConfiguracao:
-    """Gera os YAMLs mantendo as bandas da maior para a menor."""
+    """Gera os YAMLs na pasta da rodada, com bandas decrescentes."""
+    if roundtrip < 1:
+        raise ValueError("roundtrip deve ser maior ou igual a 1")
+
     bandas = tuple(sorted(configuracao.larguras_mhz, reverse=True))
-    diretorio = diretorio_out / configuracao.identificador
+    diretorio_rodada = diretorio_out / f"roundtrip_{roundtrip:02d}"
+    diretorio = diretorio_rodada / configuracao.identificador
     diretorio.mkdir(parents=True, exist_ok=True)
 
     gnb_yaml = diretorio / "gnb.yml"
