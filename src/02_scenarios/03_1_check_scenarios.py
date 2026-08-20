@@ -3,12 +3,13 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List
+from functions import (
+    MAX_CLUSTER_SIZE,
+    MAX_FIBER_DISTANCE_KM,
+    MAX_LOAD)
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
-MAX_CLUSTER_SIZE = int(5)
-MAX_FIBER_DISTANCE_KM = float(9)
-MAX_LOAD = int(430)
 TIME_LIMIT_SOLVER = int(1800)
 MAX_SOLVER_THREADS = int(8)
 

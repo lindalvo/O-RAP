@@ -8,7 +8,6 @@ import pandas as pd
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
 
-
 def add_link_distance(
     df: pd.DataFrame,
     df_dm: pd.DataFrame,
@@ -249,7 +248,7 @@ if __name__ == "__main__":
             clusters = clusters.merge(ta[["O-DU", "O-DU_ID"]],on="O-DU",how="left",validate="m:1")
             cadeia = arquivo_csv.stem.split(f"{prefixo}RMB_",1,)[1]
 
-            # Exemplos: ilp_otimizado e ilp_adversarial.
+            # Exemplos: ilp_minlink e ilp_resource_aware.
             scenario = f"{prefixo.rstrip('_')}_{cadeia}"
 
             clusters = add_link_distance(

@@ -2,6 +2,9 @@ from math import radians, sin, cos, atan2, sqrt
 from datetime import datetime, timezone
 
 EARTH_RADIUS_KM: float = 6371.0
+MAX_CLUSTER_SIZE = int(5)
+MAX_FIBER_DISTANCE_KM = float(9)
+MAX_LOAD = int(430)
 
 def designacao_para_mhz(designacao: str) -> int:
     bw = designacao[:4].upper()

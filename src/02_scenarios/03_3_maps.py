@@ -11,12 +11,13 @@ from matplotlib.patches import Patch
 from shapely import concave_hull
 from shapely.geometry import LineString, MultiPoint
 from shapely.ops import unary_union
+from functions import (
+    MAX_CLUSTER_SIZE,
+    MAX_FIBER_DISTANCE_KM,
+    MAX_LOAD)
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
-MAX_CLUSTER_SIZE = int(5)
-MAX_FIBER_DISTANCE_KM = float(9)
-MAX_LOAD = int(430)
 
 BASEMAP_FILE = DIRETORIO_OUT / f"basemap_RMB_osm.tif"
 FIGSIZE = (7.2, 7.2)
@@ -129,7 +130,13 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
         ).convex_hull.buffer(AREA_BUFFER_M)
 
         minx, miny, maxx, maxy = web_area.bounds
-
+        headers = {
+            "User-Agent": (
+                "O-RAP-O-RAN-Research/1.0 "
+                "(academic map generation; "
+                "contact: netobrpa@gmail.com)"
+            )
+        }
         ctx.bounds2raster(
             minx,
             miny,
@@ -138,6 +145,11 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
             path=basemap_file,
             zoom=11,
             source=ctx.providers.OpenStreetMap.Mapnik,
+            headers=headers,
+            n_connections=1,
+            use_cache=True,
+            wait=1,
+            max_retries=2
         )
 
     print(f"Carregando mapa-base local {basemap_file}")
@@ -149,6 +161,13 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
         alpha=0.48,
         reset_extent=True,
         zorder=0,
+        attribution=False
+    )
+    
+    ctx.add_attribution(
+        ax,
+        "© OpenStreetMap contributors",
+        font_size=6,
     )
 
 def generate_map(base, clusters, output):

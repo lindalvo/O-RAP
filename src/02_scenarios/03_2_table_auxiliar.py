@@ -8,14 +8,14 @@ DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
 
 def gerar_tabela_auxiliar_odus() -> pd.DataFrame:
     """
-    Verifica os arquivos ILP e Greedy dos cenários otimizado e adversarial,
+    Verifica os arquivos ILP e Greedy dos cenários minlink e resource_aware,
     confirma que todos possuem exatamente o mesmo conjunto de O-DUs e gera
     uma tabela auxiliar única com identificadores sequenciais.
 
     Arquivos esperados:
-        ilp_RMB_otimizado.csv
-        ilp_RMB_adversarial.csv
-        grd_RMB_adversarial.csv
+        ilp_RMB_minlink.csv
+        ilp_RMB_resource_aware.csv
+        grd_RMB_resource_aware.csv
 
     Saída:
         association_odus_{filename}.csv
