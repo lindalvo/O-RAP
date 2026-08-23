@@ -8,8 +8,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from lib import GNB_CPUSETS, GNB_NUMA, RU_CPUSETS, RU_NUMA
-from comandos import iniciar
+from common.afinidades import GNB_CPUSETS, GNB_NUMA, RU_CPUSETS, RU_NUMA
+from common.comandos import iniciar
 from configuracoes import Configuracao
 from yamls import ArquivosConfiguracao
 

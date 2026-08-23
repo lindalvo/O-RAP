@@ -1,19 +1,17 @@
-"""Remoção idempotente dos recursos de rede do pipeline."""
+"""Operações de rede compartilhadas pelos pipelines."""
 
 from __future__ import annotations
 
 import time
 from pathlib import Path
 
-from comandos import executar
-
+from common.comandos import executar
 
 TENTATIVAS_REMOCAO_NAMESPACE = 3
 INTERVALO_REMOCAO_SEGUNDOS = 0.2
 
 
 def _executar_tolerando_ausencia(comando: list[str]) -> None:
-    """Executa uma remoção sem falhar quando o recurso já não existe."""
     executar(comando, verificar=False, ocultar_stderr=True)
 
 
@@ -32,9 +30,7 @@ def remover_topologia(quantidade_rus: int, titulo: str) -> None:
 
         namespace_removido = False
         for tentativa in range(TENTATIVAS_REMOCAO_NAMESPACE):
-            _executar_tolerando_ausencia(
-                ["ip", "netns", "del", namespace]
-            )
+            _executar_tolerando_ausencia(["ip", "netns", "del", namespace])
             if not caminho_namespace.exists():
                 namespace_removido = True
                 break
@@ -49,8 +45,7 @@ def remover_topologia(quantidade_rus: int, titulo: str) -> None:
                 f"{TENTATIVAS_REMOCAO_NAMESPACE} tentativas de remoção."
             )
 
-        # O par veth normalmente desaparece junto com o namespace. Esta
-        # remoção cobre uma interface que tenha permanecido no namespace raiz.
-        _executar_tolerando_ausencia(
-            ["ip", "link", "del", interface_du]
-        )
+        _executar_tolerando_ausencia(["ip", "link", "del", interface_du])
+
+
+__all__ = ["remover_topologia"]

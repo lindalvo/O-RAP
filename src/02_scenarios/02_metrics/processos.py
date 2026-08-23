@@ -1,4 +1,8 @@
-"""Inicialização da gNB e das O-RUs da topologia experimental."""
+"""Inicialização da gNB e das O-RUs da topologia experimental.
+
+Reaproveita as definições globais compartilhadas em common.afinidades e
+common.comandos, mantendo a lógica específica do pipeline.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from afinidades import GNB_CPUSETS, GNB_NUMA, RU_CPUSETS, RU_NUMA
-from comandos import iniciar
+from common.afinidades import GNB_CPUSETS, GNB_NUMA, RU_CPUSETS, RU_NUMA
+from common.comandos import iniciar
 from configuracoes import Topologia
 from erros import ErroProcesso
 
@@ -155,7 +159,6 @@ def iniciar_gnb_e_rus(
                 )
 
     except Exception as exc:
-        # Importação local mantém os módulos desacoplados durante a carga.
         from encerramento import encerrar_processos
 
         encerrar_processos(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from configuracoes import Configuracao
-from rede import remover_topologia
+from common.rede import remover_topologia
 
 
 def desmontar_topologia(configuracao: Configuracao) -> None:

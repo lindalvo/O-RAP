@@ -1,5 +1,5 @@
 from configuracoes import Topologia
-from rede import remover_topologia
+from common.rede import remover_topologia
 
 
 def desmontar_topologia(topologia: Topologia) -> None:

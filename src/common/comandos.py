@@ -1,4 +1,4 @@
-"""Execução padronizada dos comandos externos do pipeline."""
+"""Execução de comandos com impressão prévia padronizada (compartilhado)."""
 
 from __future__ import annotations
 
@@ -38,3 +38,6 @@ def iniciar(
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+
+
+__all__ = ["executar", "iniciar"]

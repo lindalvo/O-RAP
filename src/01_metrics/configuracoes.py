@@ -7,10 +7,7 @@ from fractions import Fraction
 from itertools import combinations_with_replacement
 from math import sqrt
 
-
-LARGURAS_MHZ = (40, 50, 60, 70, 80, 90, 100)
-MAXIMO_AGREGADO_MHZ = 430
-MAXIMO_RUS = 5
+from common.constantes import LARGURAS_MHZ, MAXIMO_AGREGADO_MHZ, MAXIMO_RUS
 
 
 @dataclass(frozen=True)

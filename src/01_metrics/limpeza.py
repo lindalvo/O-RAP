@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 
-from comandos import executar
-from configuracoes import MAXIMO_RUS
-from rede import remover_topologia
+from common.constantes import MAXIMO_RUS
+from common.rede import remover_topologia
+from common.comandos import executar
 
 
 ESPERA_ENCERRAMENTO_SEGUNDOS = 2

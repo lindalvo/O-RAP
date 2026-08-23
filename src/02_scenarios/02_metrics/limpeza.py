@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import time
 
-from comandos import executar
-from rede import remover_topologia
+from common.constantes import MAXIMO_RUS
+from common.rede import remover_topologia
+from common.comandos import executar
 
 
-MAXIMO_RUS = 5
 ESPERA_ENCERRAMENTO_SEGUNDOS = 2
 
 
@@ -31,7 +31,4 @@ def limpar_ambiente_residual() -> None:
     _executar_tolerando_ausencia(["pkill", "-KILL", "-x", "ru_emulator"])
     _executar_tolerando_ausencia(["pkill", "-KILL", "-x", "gnb"])
 
-    remover_topologia(
-        MAXIMO_RUS,
-        titulo="Remoção de topologias residuais",
-    )
+    remover_topologia(MAXIMO_RUS, titulo="Remoção de topologias residuais")
