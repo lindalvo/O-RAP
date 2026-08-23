@@ -7,7 +7,7 @@ ROUND_COORD_DECIMALS = 5  # ~1.1m em latitude; longitude ~1.1m*cos(lat)
 #Regras de negócio
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 
 
 

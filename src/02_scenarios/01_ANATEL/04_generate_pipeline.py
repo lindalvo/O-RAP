@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 FIBER_DELAY_US_PER_KM = float(5.0)  # atraso de propagação em microssegundos por km de fibra óptica
 SCENARIO_SEPARATOR = "|"
 

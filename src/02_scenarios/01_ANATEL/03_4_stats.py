@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 
 def add_link_distance(
     df: pd.DataFrame,

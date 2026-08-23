@@ -17,7 +17,7 @@ from functions import (
     MAX_LOAD)
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 
 BASEMAP_FILE = DIRETORIO_OUT / f"basemap_RMB_osm.tif"
 FIGSIZE = (7.2, 7.2)
