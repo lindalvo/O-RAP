@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 
 ARQUIVO_PIPELINE =DIRETORIO_OUT / "pipeline_RMB.txt"
 SEPARADOR = ","

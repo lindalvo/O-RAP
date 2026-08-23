@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
+DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 
 ARQUIVO_BANCO =DIRETORIO_OUT / "metricas_RMB.db"
 
