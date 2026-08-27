@@ -18,7 +18,10 @@ dependencies = [
     "geopandas",
     "contextily",
     "matplotlib",
-    "shapely"
+    "shapely",
+    "statsmodels",
+    "scipy",
+    "scikit-learn"
 ]
 
 [tool.poetry]

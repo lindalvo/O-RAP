@@ -21,6 +21,7 @@ from pyomo.environ import (
     value,
 )
 from pyomo.opt import SolverFactory, TerminationCondition
+
 from functions import (
     MAX_CLUSTER_SIZE,
     MAX_FIBER_DISTANCE_KM,
