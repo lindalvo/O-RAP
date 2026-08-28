@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import statsmodels.formula.api as smf
+from common.limpeza_metricas import clean_metrics_df
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
@@ -52,24 +53,8 @@ with sqlite3.connect(DB_PATH) as con:
     )
 
 
-# Remove leituras inválidas de potência
-df = df[
-    ~(
-        (df["metric"] == "cpu_package_power")
-        & (df["value"] > 1000.0)
-    )
-].copy()
-
-# Corrige overflow de memória para fanout 4 e 5
-overflow = (
-    (df["metric"] == "memory_usage")
-    & (df["num_orus"] >= 4)
-    & (df["value"] < 2000.0)
-)
-
-df.loc[overflow, "value"] += 4096.0
-
-df["dp_carga_mhz"] = df["dp_carga_mhz"].round(6)
+# Aplica limpeza e correções conhecidas (potência inválida, overflow de memória, arredondamento de DP)
+df = clean_metrics_df(df, dp_round_digits=6, create_dp_key=False)
 
 
 # ----------------------------------------------------------------------

@@ -7,6 +7,7 @@ from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Optional
 import pandas as pd
+from common.limpeza_metricas import clean_metrics_df
 from pyomo.environ import (
     Binary,
     ConcreteModel,
@@ -126,20 +127,12 @@ def carregar_custos_empiricos(
         missing = sorted(required_columns - set(stats.columns))
         raise ValueError(f"Colunas ausentes na tabela stats: {missing}")
 
-    stats = stats.loc[
-        ~(
-            stats["metric"].eq("cpu_package_power")
-            & stats["value"].gt(1000.0)
-        )
-    ].copy()
-
-    memory_overflow = (
-        stats["metric"].eq("memory_usage")
-        & stats["num_orus"].ge(4)
-        & stats["value"].lt(2000.0)
+    # Aplica correções e normalizações conhecidas nas métricas
+    stats = clean_metrics_df(
+        stats,
+        dp_round_digits=DP_ROUND_DIGITS,
+        create_dp_key=True,
     )
-    stats.loc[memory_overflow, "value"] += 4096.0
-    stats["dp_key"] = stats["dp_carga_mhz"].round(DP_ROUND_DIGITS)
 
     full_key_columns = ["num_orus", "carga_agregada_mhz", "dp_key"]
     per_configuration_round = (
