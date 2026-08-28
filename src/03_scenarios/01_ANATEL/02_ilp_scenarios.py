@@ -56,8 +56,6 @@ OBJECTIVE_USES_DP = {
 # Larguras de banda contempladas pela campanha atual.
 EMPIRICAL_BANDWIDTHS_MHZ = (40, 50, 60, 70, 80, 90, 100)
 
-DP_ROUND_DIGITS = 6
-
 @dataclass(frozen=True)
 class DadosModeloILP:
     """Estruturas auxiliares compartilhadas pelas duas etapas lexicográficas."""
@@ -128,11 +126,7 @@ def carregar_custos_empiricos(
         raise ValueError(f"Colunas ausentes na tabela stats: {missing}")
 
     # Aplica correções e normalizações conhecidas nas métricas
-    stats = clean_metrics_df(
-        stats,
-        dp_round_digits=DP_ROUND_DIGITS,
-        create_dp_key=True,
-    )
+    stats = clean_metrics_df(stats)
 
     full_key_columns = ["num_orus", "carga_agregada_mhz", "dp_key"]
     per_configuration_round = (

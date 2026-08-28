@@ -14,8 +14,8 @@ from topologia import montar_topologia
 from yamls import gerar_yamls
 
 
-RODADAS = 10
-MAX_TENTATIVAS_POR_CONFIGURACAO = 5
+RODADAS = 20
+MAX_TENTATIVAS_POR_CONFIGURACAO = 50
 GERADOR_ALEATORIO = SystemRandom()
 
 

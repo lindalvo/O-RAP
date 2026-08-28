@@ -54,8 +54,7 @@ with sqlite3.connect(DB_PATH) as con:
 
 
 # Aplica limpeza e correções conhecidas (potência inválida, overflow de memória, arredondamento de DP)
-df = clean_metrics_df(df, dp_round_digits=6, create_dp_key=False)
-
+df = clean_metrics_df(df)
 
 # ----------------------------------------------------------------------
 # 3. Consolidação das 10 rodadas

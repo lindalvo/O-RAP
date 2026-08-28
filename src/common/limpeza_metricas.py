@@ -15,20 +15,14 @@ from typing import Optional
 
 import pandas as pd
 
+DP_ROUND_DIGITS = 6
 
-def clean_metrics_df(
-    df: pd.DataFrame,
-    dp_round_digits: int = 6,
-    create_dp_key: bool = False,
-) -> pd.DataFrame:
+def clean_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     """Aplica correções e normalizações conhecidas em um DataFrame de métricas.
 
     Parâmetros
     - df: DataFrame contendo (pelo menos) as colunas
         ['num_orus', 'metric', 'value', 'dp_carga_mhz'] quando relevantes.
-    - dp_round_digits: número de casas a usar ao arredondar dp_carga_mhz.
-    - create_dp_key: se True, adiciona a coluna 'dp_key' com dp_carga_mhz arredondado
-      (útil para agrupamentos que exigem uma chave estável).
 
     Retorna uma cópia do DataFrame com as transformações aplicadas.
     """
@@ -58,12 +52,10 @@ def clean_metrics_df(
     # Arredonda dp_carga_mhz quando presente e opcionalmente cria dp_key
     if "dp_carga_mhz" in df.columns:
         try:
-            df["dp_carga_mhz"] = df["dp_carga_mhz"].round(dp_round_digits)
+            df["dp_carga_mhz"] = df["dp_carga_mhz"].round(DP_ROUND_DIGITS)
         except Exception:
             # Evita falha caso os valores não sejam numéricos; apenas deixa como está
             pass
-        if create_dp_key:
-            df["dp_key"] = df["dp_carga_mhz"].round(dp_round_digits)
 
     return df
 
