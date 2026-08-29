@@ -48,6 +48,25 @@ OBJECTIVE_USES_DP = {
     "minmaxsched": False,
 }
 
+CROSS_EVALUATION_COLUMNS = [
+    "cenario",
+    "cpu_total_percent",
+    "memoria_total_mb",
+    "potencia_total_w",
+    "maior_latencia_prevista_us",
+]
+
+CROSS_EVALUATION_SPEC = {
+    "cpu_usage": ("cpu_total_percent", False, "sum"),
+    "memory_usage": ("memoria_total_mb", True, "sum"),
+    "cpu_package_power": ("potencia_total_w", False, "sum"),
+    "max_scheduler_latency": (
+        "maior_latencia_prevista_us",
+        False,
+        "max",
+    ),
+}
+
 # Larguras de banda contempladas pela campanha atual.
 EMPIRICAL_BANDWIDTHS_MHZ = larguras_mhz()
 
@@ -162,6 +181,124 @@ def carregar_custos_empiricos(
         consolidated["carga_agregada_mhz"].astype(int)
     )
     return consolidated.sort_values(key_columns).reset_index(drop=True)
+
+
+def carregar_custos_avaliacao(
+    db_path: Path | str,
+) -> dict[str, pd.DataFrame]:
+    """Carrega uma única vez os custos usados na avaliação cruzada."""
+    return {
+        metric: carregar_custos_empiricos(
+            db_path,
+            metric,
+            usar_dp=usar_dp,
+        )
+        for metric, (_, usar_dp, _) in CROSS_EVALUATION_SPEC.items()
+    }
+
+
+def avaliar_cenario_cruzado(
+    nome_cenario: str,
+    df_cenario: pd.DataFrame,
+    custos_por_metrica: dict[str, pd.DataFrame],
+) -> dict[str, float | str]:
+    """Avalia uma associação pelas quatro funções objetivo empíricas."""
+    required_columns = {"bandwidth", "O-DU"}
+    missing_columns = required_columns - set(df_cenario.columns)
+    if missing_columns:
+        raise ValueError(
+            "Colunas ausentes no cenário para avaliação cruzada: "
+            f"{sorted(missing_columns)}."
+        )
+
+    signatures = []
+    for du, group in df_cenario.groupby("O-DU", sort=True):
+        loads = group["bandwidth"].astype(float).tolist()
+        num_orus = len(loads)
+        total_load = int(round(sum(loads)))
+        mean_load = total_load / num_orus
+        dp_load = round(
+            math.sqrt(
+                sum((load - mean_load) ** 2 for load in loads)
+                / num_orus
+            ),
+            DP_ROUND_DIGITS,
+        )
+        signatures.append(
+            (int(du), num_orus, total_load, dp_load)
+        )
+
+    if not signatures:
+        raise ValueError(
+            f"O cenário {nome_cenario!r} não contém nenhuma O-DU."
+        )
+
+    metric_values: dict[str, list[float]] = {
+        metric: [] for metric in CROSS_EVALUATION_SPEC
+    }
+    for metric, (_, usar_dp, _) in CROSS_EVALUATION_SPEC.items():
+        if metric not in custos_por_metrica:
+            raise ValueError(
+                f"Custos ausentes para a métrica {metric!r}."
+            )
+
+        costs = custos_por_metrica[metric]
+        if usar_dp:
+            cost_index = {
+                (
+                    int(row.num_orus),
+                    int(row.carga_agregada_mhz),
+                    round(float(row.dp_carga_mhz), DP_ROUND_DIGITS),
+                ): float(row.custo_empirico)
+                for row in costs.itertuples(index=False)
+            }
+        else:
+            cost_index = {
+                (
+                    int(row.num_orus),
+                    int(row.carga_agregada_mhz),
+                ): float(row.custo_empirico)
+                for row in costs.itertuples(index=False)
+            }
+
+        for du, num_orus, total_load, dp_load in signatures:
+            signature = (
+                (num_orus, total_load, dp_load)
+                if usar_dp
+                else (num_orus, total_load)
+            )
+            if signature not in cost_index:
+                raise ValueError(
+                    "Assinatura empírica ausente durante a avaliação "
+                    f"de {nome_cenario!r}, O-DU {du}, métrica "
+                    f"{metric!r}: {signature}."
+                )
+            metric_values[metric].append(cost_index[signature])
+
+    result: dict[str, float | str] = {"cenario": nome_cenario}
+    for metric, (column, _, aggregation) in (
+        CROSS_EVALUATION_SPEC.items()
+    ):
+        values = metric_values[metric]
+        result[column] = (
+            float(sum(values))
+            if aggregation == "sum"
+            else float(max(values))
+        )
+    return result
+
+
+def gravar_avaliacao_cruzada(
+    avaliacoes: list[dict[str, float | str]],
+    output_path: Path | str,
+) -> pd.DataFrame:
+    """Grava a avaliação cruzada em CSV com valores numéricos."""
+    evaluation_df = pd.DataFrame(
+        avaliacoes,
+        columns=CROSS_EVALUATION_COLUMNS,
+    )
+    evaluation_df.to_csv(output_path, index=False)
+    return evaluation_df
 
 def enumerar_clusters_viaveis(
     custos_observados: pd.DataFrame,
@@ -1044,6 +1181,13 @@ if __name__ == "__main__":
     df_dm.index = df_dm.index.astype(int)
     df_dm.columns = df_dm.columns.astype(int)
 
+    print(
+        "Carregando os custos empíricos para a avaliação cruzada em "
+        f"{METRICS_DB_PATH}"
+    )
+    custos_avaliacao = carregar_custos_avaliacao(METRICS_DB_PATH)
+    avaliacoes_cruzadas: list[dict[str, float | str]] = []
+
     best_du_count, primary_assignment = cluster_ilp_primario(df, df_dm)
 
     # Cenário minlink: menor soma das distâncias RU-DU.
@@ -1060,6 +1204,13 @@ if __name__ == "__main__":
         )
         .set_index("NumEstacao")["O-DU"]
         .to_dict()
+    )
+    avaliacoes_cruzadas.append(
+        avaliar_cenario_cruzado(
+            "minlink",
+            df_minlink,
+            custos_avaliacao,
+        )
     )
 
     # Cenários empíricos com as posições de O-DU fixadas pelo minlink.
@@ -1078,3 +1229,22 @@ if __name__ == "__main__":
             f"Gravando o cenário {objective_mode} em {scenario_output}"
         )
         df_scenario.to_csv(scenario_output, index=False)
+        avaliacoes_cruzadas.append(
+            avaliar_cenario_cruzado(
+                objective_mode,
+                df_scenario,
+                custos_avaliacao,
+            )
+        )
+
+    cross_evaluation_output = (
+        DIRETORIO_OUT / "RMB_avaliacao_cruzada.csv"
+    )
+    print(
+        "Gravando a avaliação cruzada das funções objetivo em "
+        f"{cross_evaluation_output}"
+    )
+    gravar_avaliacao_cruzada(
+        avaliacoes_cruzadas,
+        cross_evaluation_output,
+    )

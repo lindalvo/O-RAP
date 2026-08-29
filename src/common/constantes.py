@@ -8,7 +8,7 @@ import pandas as pd
 
 
 MAXIMO_AGREGADO_MHZ = int(430)
-MAXIMO_RUS = int(4)
+MAXIMO_RUS = int(5)
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()
 DIRETORIO_ASSETS = (DIRETORIO_MAIN / "../assets").resolve()
@@ -23,8 +23,8 @@ URL_METRICAS = f"ws://{HOST_METRICAS}:{PORTA_METRICAS}"
 TIMEOUT_METRICAS_SEGUNDOS = int(60)
 INTERVALO_TENTATIVAS_SEGUNDOS = int(1)
 ESTABILIZACAO_SEGUNDOS = int(7)
-RODADAS = int(10)
-MAX_TENTATIVAS = int(5)
+RODADAS = int(20)
+MAX_TENTATIVAS = int(10)
 ATRASO_DU_RU_US = int(60)
 
 def designacao_para_mhz(designacao: str) -> int:
