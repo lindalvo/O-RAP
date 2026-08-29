@@ -1,9 +1,7 @@
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
+from common.constantes import DIRETORIO_OUT
 
 ARQUIVO_PIPELINE =DIRETORIO_OUT / "pipeline_RMB.txt"
 SEPARADOR = ","

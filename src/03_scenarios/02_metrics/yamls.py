@@ -7,11 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from configuracoes import Topologia
+from common.constantes import DIRETORIO_OUT, DIRETORIO_ASSETS
 
-
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_ASSETS = (DIRETORIO_MAIN / "../../assets").resolve()
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 PADRAO_PLACEHOLDER = re.compile(r"__[A-Z0-9_]+__")
 
 

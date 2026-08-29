@@ -6,10 +6,7 @@ from common.comandos import executar
 from common.topology import comandos_da_ru
 from configuracoes import Configuracao
 from common.rede import remover_topologia
-
-
-ATRASO_DU_RU_US = 60
-
+from common.constantes import ATRASO_DU_RU_US
 
 def montar_topologia(configuracao: Configuracao) -> None:
     """Monta uma topologia com um namespace e uma veth por O-RU.

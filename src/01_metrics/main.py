@@ -12,10 +12,8 @@ from limpeza import limpar_ambiente_residual
 from processos import iniciar_gnb_e_rus
 from topologia import montar_topologia
 from yamls import gerar_yamls
+from common.constantes import (MAX_TENTATIVAS,RODADAS)
 
-
-RODADAS = 20
-MAX_TENTATIVAS_POR_CONFIGURACAO = 50
 GERADOR_ALEATORIO = SystemRandom()
 
 
@@ -77,7 +75,7 @@ def main() -> None:
                 f"roundtrip={roundtrip}",
                 configuracao.identificador,
                 configuracao.larguras_mhz,
-                f"tentativa={tentativa}/{MAX_TENTATIVAS_POR_CONFIGURACAO}",
+                f"tentativa={tentativa}/{MAX_TENTATIVAS}",
                 flush=True,
             )
 
@@ -91,7 +89,7 @@ def main() -> None:
                     roundtrip,
                 )
             except ErroColeta as exc:
-                if tentativa < MAX_TENTATIVAS_POR_CONFIGURACAO:
+                if tentativa < MAX_TENTATIVAS:
                     fila.append(configuracao)
                     print(
                         f"Coleta falhou para {configuracao.identificador} "
@@ -102,7 +100,7 @@ def main() -> None:
                 else:
                     esgotadas.append((configuracao, exc))
                     print(
-                        f"Limite de {MAX_TENTATIVAS_POR_CONFIGURACAO} "
+                        f"Limite de {MAX_TENTATIVAS} "
                         f"tentativas atingido para "
                         f"{configuracao.identificador}; as demais "
                         "configurações da rodada continuarão.",
@@ -121,7 +119,7 @@ def main() -> None:
             raise RuntimeError(
                 f"roundtrip={roundtrip} não foi concluída: "
                 f"{len(esgotadas)} configuração(ões) falharam após "
-                f"{MAX_TENTATIVAS_POR_CONFIGURACAO} tentativas: "
+                f"{MAX_TENTATIVAS} tentativas: "
                 f"{identificadores}. O pipeline não avançará para a "
                 "rodada seguinte; uma reinicialização retomará as "
                 "configurações ausentes."

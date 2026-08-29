@@ -11,13 +11,7 @@ from matplotlib.patches import Patch
 from shapely import concave_hull
 from shapely.geometry import LineString, MultiPoint
 from shapely.ops import unary_union
-from functions import (
-    MAX_CLUSTER_SIZE,
-    MAX_FIBER_DISTANCE_KM,
-    MAX_LOAD)
-
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
+from common.constantes import DIRETORIO_OUT
 
 BASEMAP_FILE = DIRETORIO_OUT / f"basemap_RMB_osm.tif"
 FIGSIZE = (7.2, 7.2)

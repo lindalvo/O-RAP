@@ -2,9 +2,7 @@ import os
 from pathlib import Path
 import pandas as pd
 
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
-
+from common.constantes import DIRETORIO_OUT
 
 def gerar_tabela_auxiliar_odus() -> pd.DataFrame:
     """

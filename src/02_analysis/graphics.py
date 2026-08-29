@@ -7,8 +7,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MultipleLocator
-
-from common.limpeza_metricas import clean_metrics_df
+from common.constantes import clean_metrics_df
 
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent

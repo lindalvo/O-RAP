@@ -19,11 +19,9 @@ from common.metricas import (
 )
 from configuracoes import Topologia
 from erros import ErroColeta
+from common.constantes import DURACAO_COLETA_SEGUNDOS, TIMEOUT_CONEXAO_SEGUNDOS, URL_METRICAS
 
 
-URL_METRICAS = "ws://127.0.0.1:8001"
-DURACAO_COLETA_SEGUNDOS = 30
-TIMEOUT_CONEXAO_SEGUNDOS = 10
 
 
 def _identificar_amostras(

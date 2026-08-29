@@ -20,10 +20,8 @@ from limpeza import limpar_ambiente_residual
 from processos import iniciar_gnb_e_rus
 from topologia import montar_topologia
 from yamls import gerar_yamls
+from common.constantes import (MAX_TENTATIVAS,RODADAS)
 
-
-RODADAS = 10
-MAX_TENTATIVAS_POR_TOPOLOGIA = 5
 GERADOR_ALEATORIO = SystemRandom()
 
 
@@ -124,14 +122,14 @@ def main() -> None:
                 f"cenario={topologia.cenario} "
                 f"odu={topologia.identificador} "
                 f"orus={topologia.quantidade_rus} "
-                f"tentativa={tentativa}/{MAX_TENTATIVAS_POR_TOPOLOGIA}",
+                f"tentativa={tentativa}/{MAX_TENTATIVAS}",
                 flush=True,
             )
 
             try:
                 _executar_topologia(topologia, roundtrip)
             except ErroExecucaoRecuperavel as exc:
-                if tentativa < MAX_TENTATIVAS_POR_TOPOLOGIA:
+                if tentativa < MAX_TENTATIVAS:
                     # A linha volta ao fim da fila. Assim, as demais topologias
                     # são executadas antes da nova tentativa.
                     fila.append(topologia)
@@ -158,7 +156,7 @@ def main() -> None:
             raise RuntimeError(
                 f"roundtrip={roundtrip} não foi concluída: "
                 f"{len(esgotadas)} topologia(s) falharam após "
-                f"{MAX_TENTATIVAS_POR_TOPOLOGIA} tentativas: {falhas}. "
+                f"{MAX_TENTATIVAS} tentativas: {falhas}. "
                 "O pipeline não avançará de rodada; na próxima execução, "
                 "o banco identificará e retomará somente as linhas ausentes."
             )

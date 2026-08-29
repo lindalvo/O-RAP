@@ -7,7 +7,7 @@ from fractions import Fraction
 from itertools import combinations_with_replacement
 from math import sqrt
 
-from common.constantes import LARGURAS_MHZ, MAXIMO_AGREGADO_MHZ, MAXIMO_RUS
+from common.constantes import larguras_mhz, MAXIMO_AGREGADO_MHZ, MAXIMO_RUS
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ def _variancia_populacional_exata(bandas: tuple[int, ...]) -> Fraction:
 def gerar_configuracoes() -> list[Configuracao]:
     configuracoes: list[Configuracao] = []
     numero = 0
-
+    
     for quantidade_rus in range(1, MAXIMO_RUS + 1):
         # A chave inclui a variância exata. Assim, para a mesma quantidade de
         # RUs e carga agregada, distribuições com o mesmo desvio padrão não são
@@ -50,9 +50,10 @@ def gerar_configuracoes() -> list[Configuracao]:
         configuracoes_unicas: dict[
             tuple[int, Fraction], tuple[int, ...]
         ] = {}
+        larguras_de_banda = larguras_mhz()
 
         for bandas_crescentes in combinations_with_replacement(
-            LARGURAS_MHZ, quantidade_rus
+            larguras_de_banda, quantidade_rus
         ):
             carga_agregada = sum(bandas_crescentes)
 

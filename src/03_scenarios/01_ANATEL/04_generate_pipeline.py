@@ -2,9 +2,7 @@ import csv
 import os
 from pathlib import Path
 import pandas as pd
-
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
+from common.constantes import DIRETORIO_OUT
 FIBER_DELAY_US_PER_KM = float(5.0)  # atraso de propagação em microssegundos por km de fibra óptica
 SCENARIO_SEPARATOR = "|"
 

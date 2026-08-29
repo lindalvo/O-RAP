@@ -4,9 +4,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
-
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
+from common.constantes import DIRETORIO_OUT
 
 def add_link_distance(
     df: pd.DataFrame,

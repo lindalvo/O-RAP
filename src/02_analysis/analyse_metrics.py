@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import statsmodels.formula.api as smf
-from common.limpeza_metricas import clean_metrics_df
+from common.constantes import clean_metrics_df
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
 DIRETORIO_OUT = (DIRETORIO_MAIN / "../OUT").resolve()

@@ -7,19 +7,11 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-
 from common.afinidades import GNB_CPUSETS, GNB_NUMA, RU_CPUSETS, RU_NUMA
 from common.comandos import iniciar
+from common.constantes import HOST_METRICAS, PORTA_METRICAS, TIMEOUT_METRICAS_SEGUNDOS, INTERVALO_TENTATIVAS_SEGUNDOS, ESTABILIZACAO_SEGUNDOS
 from configuracoes import Configuracao
 from yamls import ArquivosConfiguracao
-
-
-HOST_METRICAS = "127.0.0.1"
-PORTA_METRICAS = 8001
-TIMEOUT_METRICAS_SEGUNDOS = 60
-INTERVALO_TENTATIVAS_SEGUNDOS = 1
-ESTABILIZACAO_SEGUNDOS = 7
-
 
 @dataclass(frozen=True)
 class ProcessosAtivos:
@@ -28,14 +20,10 @@ class ProcessosAtivos:
 
 
 def aguardar_porta_metricas(
-    host: str = HOST_METRICAS,
-    porta: int = PORTA_METRICAS,
-    timeout_segundos: float = TIMEOUT_METRICAS_SEGUNDOS,
-    intervalo_segundos: float = INTERVALO_TENTATIVAS_SEGUNDOS,
     processo_gnb: subprocess.Popen | None = None,
 ) -> None:
     """Aguarda uma conexão TCP com o serviço de métricas da gNB."""
-    limite = time.monotonic() + timeout_segundos
+    limite = time.monotonic() + TIMEOUT_METRICAS_SEGUNDOS
 
     while time.monotonic() < limite:
         if processo_gnb is not None and processo_gnb.poll() is not None:
@@ -44,17 +32,17 @@ def aguardar_porta_metricas(
                 f"(retorno={processo_gnb.returncode})."
             )
         try:
-            with socket.create_connection((host, porta), timeout=1):
-                print(f"Serviço de métricas disponível em {host}:{porta}.")
+            with socket.create_connection((HOST_METRICAS, PORTA_METRICAS), timeout=1):
+                print(f"Serviço de métricas disponível em {HOST_METRICAS}:{PORTA_METRICAS}.")
                 return
         except OSError:
             restante = limite - time.monotonic()
             if restante > 0:
-                time.sleep(min(intervalo_segundos, restante))
+                time.sleep(min(INTERVALO_TENTATIVAS_SEGUNDOS, restante))
 
     raise TimeoutError(
-        f"Serviço de métricas indisponível em {host}:{porta} "
-        f"após {timeout_segundos:g} segundos."
+        f"Serviço de métricas indisponível em {HOST_METRICAS}:{PORTA_METRICAS} "
+        f"após {TIMEOUT_METRICAS_SEGUNDOS:g} segundos."
     )
 
 

@@ -19,10 +19,7 @@ from common.metricas import (
 )
 from configuracoes import Configuracao
 
-
-URL_METRICAS = "ws://127.0.0.1:8001"
-DURACAO_COLETA_SEGUNDOS = 30
-
+from common.constantes import (DURACAO_COLETA_SEGUNDOS,URL_METRICAS)
 
 class ErroColeta(RuntimeError):
     def __init__(self, codigo: int, tipo: str, mensagem: str):

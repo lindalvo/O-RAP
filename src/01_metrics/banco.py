@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from configuracoes import Configuracao
-from yamls import DIRETORIO_OUT
+from common.constantes import DIRETORIO_OUT
 
 
 DB_PATH = DIRETORIO_OUT / "metricas.db"

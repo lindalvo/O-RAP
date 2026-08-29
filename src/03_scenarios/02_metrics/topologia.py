@@ -12,9 +12,7 @@ from common.topology import comandos_da_ru
 from configuracoes import Topologia
 from erros import ErroTopologia
 from common.rede import remover_topologia
-
-
-ATRASO_FIXO_US = 60
+from common.constantes import ATRASO_DU_RU_US
 
 
 def montar_topologia(topologia: Topologia) -> None:

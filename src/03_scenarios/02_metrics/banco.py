@@ -7,8 +7,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Protocol
 
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
+from common.constantes import DIRETORIO_OUT
 
 ARQUIVO_BANCO =DIRETORIO_OUT / "metricas_RMB.db"
 

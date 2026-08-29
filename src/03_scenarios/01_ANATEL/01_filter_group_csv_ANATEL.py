@@ -2,14 +2,12 @@ import os
 from pathlib import Path
 import pandas as pd
 import chardet
-from functions import designacao_para_mhz, haversine_distance
+import pickle
+from common.constantes import designacao_para_mhz, haversine_distance, DIRETORIO_OUT
 ROUND_COORD_DECIMALS = 5  # ~1.1m em latitude; longitude ~1.1m*cos(lat)
 #Regras de negócio
 
 DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
-
-
 
 def main() -> int:
     N_total_linhas = 0
@@ -86,7 +84,11 @@ def main() -> int:
     out_path = DIRETORIO_OUT / 'grp_RMB.csv'
     print(f"\t Salvando CSV Agrupado por RU: {out_path}")
     df_grouped.to_csv(out_path, index=False)
-    
+    bandwidths = (pd.to_numeric(df_grouped["bandwidth"], errors="coerce").dropna().astype(int).unique())
+    bandwidths_tuple = tuple(sorted(int(value) for value in bandwidths))
+    with open(DIRETORIO_OUT / 'bandwidths.pkl', "wb") as arquivo:
+        pickle.dump(bandwidths_tuple, arquivo)
+    print(f"\t Salvando Bandwidths: {DIRETORIO_OUT / 'bandwidths.pkl'}")
     #Criando a matriz de Distâncias Vazia
     out_path = DIRETORIO_OUT / f"dm_RMB.csv"
     matriz = pd.DataFrame(

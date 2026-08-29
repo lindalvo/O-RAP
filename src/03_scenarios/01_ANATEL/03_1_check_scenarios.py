@@ -3,15 +3,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List
-from functions import (
-    MAX_CLUSTER_SIZE,
-    MAX_FIBER_DISTANCE_KM,
-    MAX_LOAD)
+from common.constantes import MAXIMO_AGREGADO_MHZ, MAXIMO_RUS, DIRETORIO_OUT, MAX_FIBER_DISTANCE_KM
 
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
-TIME_LIMIT_SOLVER = int(1800)
-MAX_SOLVER_THREADS = int(8)
 
 def check_rules(df, df_dm):
     #checa se as regras de clusterização foram respeitadas
@@ -45,14 +38,14 @@ def check_rules(df, df_dm):
 
     # Regra 2: carga por DU
     loads = df.groupby("O-DU", as_index=True)["bandwidth"].sum()
-    over = loads[loads > (MAX_LOAD)]
+    over = loads[loads > (MAXIMO_AGREGADO_MHZ)]
     if not over.empty:
         ok = False
         over = over.sort_values(ascending=False)
-        print(f"[VIOL-2] : DUs com carga acima do limite {MAX_LOAD} "
+        print(f"[VIOL-2] : DUs com carga acima do limite {MAXIMO_AGREGADO_MHZ} "
               f"({len(over)} violações)")
         for du, val in over.head(10).items():
-            print(f"  - DU {du}: load={float(val):.6f} (excesso={float(val - MAX_LOAD):.6f})")
+            print(f"  - DU {du}: load={float(val):.6f} (excesso={float(val - MAXIMO_AGREGADO_MHZ):.6f})")
 
     # Regra 3: se alguém aponta para j, então j aponta para j
     du_set = set(df["O-DU"].unique())
@@ -77,7 +70,7 @@ def check_rules(df, df_dm):
 
     # Regra 4: tamanho máximo do cluster
     cluster_sizes = df.groupby("O-DU", as_index=True).size()
-    over_size = cluster_sizes[cluster_sizes > MAX_CLUSTER_SIZE]
+    over_size = cluster_sizes[cluster_sizes > MAXIMO_RUS]
 
     size_violations: List[Dict[str, Any]] = []
 
@@ -91,11 +84,11 @@ def check_rules(df, df_dm):
             size_violations.append({
                 "du": du,
                 "cluster_size": int(size),
-                "excess": int(size - MAX_CLUSTER_SIZE),
+                "excess": int(size - MAXIMO_RUS),
                 "members": members
             })
 
-        print(f"[VIOL-4] : DUs com mais de {MAX_CLUSTER_SIZE} RUs associadas "
+        print(f"[VIOL-4] : DUs com mais de {MAXIMO_RUS} RUs associadas "
               f"contando a própria DU ({len(size_violations)} violações)")
         for v in size_violations[:10]:
             print(f"  - DU {v['du']}: cluster_size={v['cluster_size']} "
@@ -105,8 +98,8 @@ def check_rules(df, df_dm):
     if ok:
         print(f"[OK]: sem violações. "
               f"(MAX_DIST={MAX_FIBER_DISTANCE_KM} km, "
-              f"MAX_LOAD={MAX_LOAD}, "
-              f"MAX_CLUSTER_SIZE={MAX_CLUSTER_SIZE})")
+              f"MAX_LOAD={MAXIMO_AGREGADO_MHZ}, "
+              f"MAX_CLUSTER_SIZE={MAXIMO_RUS})")
     else:
         print(f"[RESUMO]: "
               f"{len(dist_violations)} viol. distâncias, "

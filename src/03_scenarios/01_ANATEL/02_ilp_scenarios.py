@@ -1,13 +1,13 @@
 import math
 import os
 import sqlite3
+import pickle
 import time
 from dataclasses import dataclass
 from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Optional
 import pandas as pd
-from common.limpeza_metricas import clean_metrics_df
 from pyomo.environ import (
     Binary,
     ConcreteModel,
@@ -23,13 +23,8 @@ from pyomo.environ import (
 )
 from pyomo.opt import SolverFactory, TerminationCondition
 
-from functions import (
-    MAX_CLUSTER_SIZE,
-    MAX_FIBER_DISTANCE_KM,
-    MAX_LOAD)
+from common.constantes import larguras_mhz, clean_metrics_df, MAXIMO_AGREGADO_MHZ, MAXIMO_RUS, DIRETORIO_OUT, DP_ROUND_DIGITS, MAX_FIBER_DISTANCE_KM
 
-DIRETORIO_MAIN = Path(__file__).resolve().parent
-DIRETORIO_OUT = (DIRETORIO_MAIN / "../../OUT").resolve()
 TIME_LIMIT_SOLVER = int(1800)
 MAX_SOLVER_THREADS = int(8)
 METRICS_DB_PATH = DIRETORIO_OUT / "metricas.db"
@@ -54,7 +49,7 @@ OBJECTIVE_USES_DP = {
 }
 
 # Larguras de banda contempladas pela campanha atual.
-EMPIRICAL_BANDWIDTHS_MHZ = (40, 50, 60, 70, 80, 90, 100)
+EMPIRICAL_BANDWIDTHS_MHZ = larguras_mhz()
 
 @dataclass(frozen=True)
 class DadosModeloILP:
@@ -128,7 +123,7 @@ def carregar_custos_empiricos(
     # Aplica correções e normalizações conhecidas nas métricas
     stats = clean_metrics_df(stats)
 
-    full_key_columns = ["num_orus", "carga_agregada_mhz", "dp_key"]
+    full_key_columns = ["num_orus", "carga_agregada_mhz", "dp_carga_mhz"]
     per_configuration_round = (
         stats.groupby(
             full_key_columns + ["roundtrip", "metric"],
@@ -184,7 +179,7 @@ def enumerar_clusters_viaveis(
             (
                 int(row.num_orus),
                 int(row.carga_agregada_mhz),
-                round(float(row.dp_key), DP_ROUND_DIGITS),
+                round(float(row.dp_carga_mhz), DP_ROUND_DIGITS),
             ): float(row.custo_empirico)
             for row in custos_observados.itertuples(index=False)
         }
@@ -198,13 +193,13 @@ def enumerar_clusters_viaveis(
         }
 
     signatures: dict[tuple[int, ...], dict[str, object]] = {}
-    for num_orus in range(1, MAX_CLUSTER_SIZE + 1):
+    for num_orus in range(1, MAXIMO_RUS + 1):
         for loads in combinations_with_replacement(
             EMPIRICAL_BANDWIDTHS_MHZ,
             num_orus,
         ):
             total_load = int(sum(loads))
-            if total_load > MAX_LOAD:
+            if total_load > MAXIMO_AGREGADO_MHZ:
                 continue
             sum_squares = int(sum(load * load for load in loads))
             mean_load = total_load / num_orus
@@ -329,10 +324,10 @@ def criar_modelo_base(
         "Critério de distância máxima para pares RU-DU: "
         f"{MAX_FIBER_DISTANCE_KM} km"
     )
-    print(f"Critério de carga máxima por DU: {MAX_LOAD} MHz")
+    print(f"Critério de carga máxima por DU: {MAXIMO_AGREGADO_MHZ} MHz")
     print(
         "Critério de tamanho máximo de cluster: "
-        f"{MAX_CLUSTER_SIZE} RUs (incluindo a própria DU)"
+        f"{MAXIMO_RUS} RUs (incluindo a própria DU)"
     )
     print(
         "Número de pares válidos (i,j) para conexão: "
@@ -373,7 +368,7 @@ def criar_modelo_base(
                 mm.ru_load[i] * mm.x[i, j]
                 for i in dados.incoming_by_j[j]
             )
-            <= float(MAX_LOAD) * mm.y[j]
+            <= float(MAXIMO_AGREGADO_MHZ) * mm.y[j]
         )
 
     modelo.Capacity = Constraint(modelo.I, rule=capacity_rule)
@@ -386,7 +381,7 @@ def criar_modelo_base(
     def max_cluster_size_rule(mm, j):
         return (
             sum(mm.x[i, j] for i in dados.incoming_by_j[j])
-            <= MAX_CLUSTER_SIZE * mm.y[j]
+            <= MAXIMO_RUS * mm.y[j]
         )
 
     modelo.MaxClusterSize = Constraint(
@@ -397,7 +392,7 @@ def criar_modelo_base(
     TAXA_MAX_OCUPACAO_REDE = 0.90
     def global_redundancy_rule(mm):
         total_orus = len(dados.num_estacoes)
-        return total_orus <= (MAX_CLUSTER_SIZE * TAXA_MAX_OCUPACAO_REDE) * sum(mm.y[j] for j in mm.I)
+        return total_orus <= (MAXIMO_RUS * TAXA_MAX_OCUPACAO_REDE) * sum(mm.y[j] for j in mm.I)
 
     modelo.GlobalRedundancy = Constraint(rule=global_redundancy_rule)
 
@@ -513,10 +508,10 @@ def cluster_ilp_primario(
     )
 
     lower_bound_fanout = math.ceil(
-        len(dados.num_estacoes) / MAX_CLUSTER_SIZE
+        len(dados.num_estacoes) / MAXIMO_RUS
     )
     lower_bound_capacity = math.ceil(
-        sum(dados.loads.values()) / MAX_LOAD
+        sum(dados.loads.values()) / MAXIMO_AGREGADO_MHZ
     )
     lower_bound_du = max(lower_bound_fanout, lower_bound_capacity)
 
@@ -1038,7 +1033,7 @@ if __name__ == "__main__":
         inplace=True,
     )
     df["NumEstacao"] = df["NumEstacao"].astype(int)
-
+    print(f"Carregadas {len(EMPIRICAL_BANDWIDTHS_MHZ)} larguras de banda empíricas.")
     csv_path = DIRETORIO_OUT / f"dm_RMB.csv"
     if not csv_path.exists():
         raise FileNotFoundError(
