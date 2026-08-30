@@ -9,7 +9,7 @@ from configuracoes import Configuracao, gerar_configuracoes
 from desmontagem import desmontar_topologia
 from encerramento import encerrar_processos
 from limpeza import limpar_ambiente_residual
-from processos import iniciar_gnb_e_rus
+from processos import ErroProcesso, iniciar_gnb_e_rus
 from topologia import montar_topologia
 from yamls import gerar_yamls
 from common.constantes import (MAX_TENTATIVAS,RODADAS)
@@ -65,7 +65,7 @@ def main() -> None:
 
         fila = deque(pendentes)
         tentativas = {configuracao: 0 for configuracao in pendentes}
-        esgotadas: list[tuple[Configuracao, ErroColeta]] = []
+        esgotadas: list[tuple[Configuracao, ErroColeta | ErroProcesso]] = []
 
         while fila:
             configuracao = fila.popleft()
@@ -84,10 +84,7 @@ def main() -> None:
             try:
                 montar_topologia(configuracao)
                 processos = iniciar_gnb_e_rus(configuracao, arquivos)
-                coletar_metricas(
-                    configuracao,
-                    roundtrip,
-                )
+                coletar_metricas(configuracao, roundtrip)
             except ErroColeta as exc:
                 if tentativa < MAX_TENTATIVAS:
                     fila.append(configuracao)
@@ -104,6 +101,22 @@ def main() -> None:
                         f"tentativas atingido para "
                         f"{configuracao.identificador}; as demais "
                         "configurações da rodada continuarão.",
+                        flush=True,
+                    )
+            except ErroProcesso as exc:
+                if tentativa < MAX_TENTATIVAS:
+                    fila.append(configuracao)
+                    print(
+                        f"Falha ao iniciar processos para "
+                        f"{configuracao.identificador}: {exc}. "
+                        "Configuração recolocada no final da fila.",
+                        flush=True,
+                    )
+                else:
+                    esgotadas.append((configuracao, exc))
+                    print(
+                        f"Limite de tentativas atingido para "
+                        f"{configuracao.identificador}; as demais continuarão.",
                         flush=True,
                     )
             finally:

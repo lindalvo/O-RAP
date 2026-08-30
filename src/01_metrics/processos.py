@@ -1,7 +1,3 @@
-"""Impressão dos comandos de inicialização da gNB e das O-RUs."""
-
-from __future__ import annotations
-
 import socket
 import subprocess
 import time
@@ -12,6 +8,9 @@ from common.comandos import iniciar
 from common.constantes import HOST_METRICAS, PORTA_METRICAS, TIMEOUT_METRICAS_SEGUNDOS, INTERVALO_TENTATIVAS_SEGUNDOS, ESTABILIZACAO_SEGUNDOS
 from configuracoes import Configuracao
 from yamls import ArquivosConfiguracao
+
+class ErroProcesso(RuntimeError):
+    """Falha recuperável durante a inicialização dos processos."""
 
 @dataclass(frozen=True)
 class ProcessosAtivos:
@@ -27,7 +26,7 @@ def aguardar_porta_metricas(
 
     while time.monotonic() < limite:
         if processo_gnb is not None and processo_gnb.poll() is not None:
-            raise RuntimeError(
+            raise ErroProcesso(
                 "A gNB encerrou antes de disponibilizar a porta de métricas "
                 f"(retorno={processo_gnb.returncode})."
             )
@@ -40,7 +39,7 @@ def aguardar_porta_metricas(
             if restante > 0:
                 time.sleep(min(INTERVALO_TENTATIVAS_SEGUNDOS, restante))
 
-    raise TimeoutError(
+    raise ErroProcesso(
         f"Serviço de métricas indisponível em {HOST_METRICAS}:{PORTA_METRICAS} "
         f"após {TIMEOUT_METRICAS_SEGUNDOS:g} segundos."
     )
@@ -62,10 +61,11 @@ def iniciar_gnb_e_rus(
         "-c",
         str(arquivos.gnb_yaml),
     ]
-    processo_gnb = iniciar(
-        comando_gnb,
-        arquivos.diretorio / "gnb.out",
-    )
+    try:
+        processo_gnb = iniciar(comando_gnb, arquivos.diretorio / "gnb.out")
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ErroProcesso(f"Falha ao iniciar a gNB: {exc}") from exc
+
     processos_rus: list[subprocess.Popen] = []
 
     try:
@@ -103,20 +103,21 @@ def iniciar_gnb_e_rus(
             flush=True,
         )
         time.sleep(ESTABILIZACAO_SEGUNDOS)
-
+        if processo_gnb.poll() is not None:
+            raise ErroProcesso(f"A gNB encerrou durante a estabilização (retorno={processo_gnb.returncode}).")
         for indice, processo_ru in enumerate(processos_rus, start=1):
             if processo_ru.poll() is not None:
-                raise RuntimeError(
+                raise ErroProcesso(
                     f"A O-RU {indice} encerrou durante a estabilização "
                     f"(retorno={processo_ru.returncode})."
                 )
-    except Exception:
+    except ErroProcesso:
         # Importação local evita dependência circular entre os módulos.
         from encerramento import encerrar_processos
-
-        encerrar_processos(
-            ProcessosAtivos(processo_gnb, tuple(processos_rus))
-        )
+        encerrar_processos(ProcessosAtivos(processo_gnb, tuple(processos_rus)))
         raise
-
+    except (OSError, subprocess.SubprocessError) as exc:
+        from encerramento import encerrar_processos
+        encerrar_processos(ProcessosAtivos(processo_gnb, tuple(processos_rus)))
+        raise ErroProcesso(f"Falha ao iniciar uma O-RU: {exc}") from exc
     return ProcessosAtivos(processo_gnb, tuple(processos_rus))
