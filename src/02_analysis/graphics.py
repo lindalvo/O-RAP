@@ -333,7 +333,7 @@ def draw_memory_dp_chart(
 
     setup_axis(
         ax,
-        ylabel="Memória corrigida (MB)",
+        ylabel="Memória (MB)",
         ylim=(2800, 4900),
         ystep=250,
     )
@@ -419,7 +419,7 @@ def generate_all(db_path: Path, output_dir: Path) -> None:
         memory,
         memory_rounds,
         title="Memória por fanout e carga agregada",
-        ylabel="Memória corrigida (MB)",
+        ylabel="Memória (MB)",
         output=output_dir / "memoria_por_fanout_carga.pdf",
         ylim=(2800, 4900),
         ystep=250,

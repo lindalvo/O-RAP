@@ -102,11 +102,11 @@ def clean_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
         if mask_invalid_power.any():
             df = df.loc[~mask_invalid_power].copy()
 
-    # Corrige overflow de memória para fanout >= 4 e valores < 2000
+    # Corrige overflow de memória para fanout >= 3 e valores < 2000
     if {"metric", "num_orus", "value"}.issubset(df.columns):
         mask_overflow = (
             (df["metric"] == "memory_usage")
-            & (df["num_orus"] >= 4)
+            & (df["num_orus"] >= 3)
             & (df["value"] < 2000.0)
         )
         if mask_overflow.any():
