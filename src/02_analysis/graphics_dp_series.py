@@ -3,7 +3,6 @@ from pathlib import Path
 import sqlite3
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MultipleLocator
@@ -261,127 +260,188 @@ def draw_line_chart(
     plt.close(fig)
 
 
-def dp_to_size(dp: np.ndarray | pd.Series | float) -> np.ndarray | float:
-    """Converte o DP da composição em área do marcador do scatter."""
-    return 26.0 + 3.0 * np.asarray(dp)
+def select_memory_dp_series(
+    per_config: pd.DataFrame,
+    *,
+    fanouts: tuple[int, ...] = (4, 5),
+    min_dps: int = 5,
+    top_n: int = 5,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Seleciona as combinações (fanout, carga agregada) com melhor cobertura de DP.
+
+    Cada série do gráfico mantém fanout e carga agregada constantes; portanto,
+    somente o desvio padrão da distribuição das cargas varia no eixo x.
+    A seleção considera apenas os fanouts informados, exige pelo menos
+    ``min_dps`` valores distintos de DP e mantém, no máximo, as ``top_n``
+    combinações com maior cobertura.
+    """
+    candidates = per_config.loc[per_config["fanout"].isin(fanouts)].copy()
+    if candidates.empty:
+        raise RuntimeError(
+            f"Não há configurações de memória para os fanouts {fanouts}."
+        )
+
+    coverage = (
+        candidates.groupby(["fanout", "load"], as_index=False)
+        .agg(
+            n_dps=("std", "nunique"),
+            dp_min=("std", "min"),
+            dp_max=("std", "max"),
+        )
+        .query("n_dps >= @min_dps")
+        .sort_values(
+            ["n_dps", "fanout", "load"],
+            ascending=[False, False, True],
+        )
+        .head(top_n)
+        .reset_index(drop=True)
+    )
+
+    if coverage.empty:
+        available = (
+            candidates.groupby(["fanout", "load"])["std"]
+            .nunique()
+            .sort_values(ascending=False)
+        )
+        best = int(available.iloc[0]) if not available.empty else 0
+        raise RuntimeError(
+            "Nenhuma combinação (fanout, carga agregada) possui pelo menos "
+            f"{min_dps} valores distintos de DP. A melhor possui {best}."
+        )
+
+    selected = candidates.merge(
+        coverage[["fanout", "load"]],
+        on=["fanout", "load"],
+        how="inner",
+    ).sort_values(["fanout", "load", "std"])
+
+    return selected, coverage
+
+
+def _padded_limits(
+    values: pd.Series,
+    *,
+    pad_fraction: float = 0.05,
+    minimum_pad: float = 1.0,
+) -> tuple[float, float]:
+    """Retorna limites com uma pequena margem visual em torno dos dados."""
+    lower = float(values.min())
+    upper = float(values.max())
+    span = upper - lower
+    pad = max(span * pad_fraction, minimum_pad)
+    return lower - pad, upper + pad
 
 
 def draw_memory_dp_chart(
     per_config: pd.DataFrame,
     n_rounds: int,
     output: Path,
+    *,
+    fanouts: tuple[int, ...] = (4, 5),
+    min_dps: int = 10,
+    top_n: int = 10,
 ) -> None:
-    """Plota memória por fanout/carga, usando o DP no tamanho dos pontos."""
-    med = medians_by_fanout_load(per_config)
+    """
+    Plota memória em função do DP para séries de fanout/carga fixos.
+
+    As séries são as combinações (fanout, carga agregada) de fanouts 4 ou 5
+    com maior quantidade de valores distintos de DP. Isso isola visualmente
+    a relação entre dispersão interna das cargas e consumo de memória.
+    """
+    selected, coverage = select_memory_dp_series(
+        per_config,
+        fanouts=fanouts,
+        min_dps=min_dps,
+        top_n=top_n,
+    )
 
     fig, ax = plt.subplots(figsize=FIGSIZE_DP)
-    fig.subplots_adjust(left=0.07, right=0.985, bottom=0.12, top=0.77)
+    fig.subplots_adjust(left=0.08, right=0.985, bottom=0.12, top=0.76)
 
     fig.suptitle(
-        "Memória por fanout e carga agregada",
-        x=0.07,
+        "Memória por desvio padrão da distribuição das cargas",
+        x=0.08,
         y=0.97,
         ha="left",
         fontsize=23,
         fontweight="bold",
     )
     fig.text(
-        0.07,
+        0.08,
         0.925,
-        f"Cada ponto representa uma configuração consolidada em {plural_rounds(n_rounds)}; "
-        "as linhas mostram a mediana para cada fanout e carga",
+        f"Séries com fanout e carga agregada fixos, consolidadas em {plural_rounds(n_rounds)}; "
+        f"seleção das {len(coverage)} combinações com maior cobertura (mínimo de {min_dps} DPs)",
         ha="left",
         fontsize=15,
         color="#4c4c4c",
     )
 
-    for fanout in FANOUT_LABELS:
-        d = per_config.loc[per_config["fanout"] == fanout]
-        if d.empty:
-            continue
+    cmap = plt.get_cmap("tab10")
 
-        ax.scatter(
-            d["load"],
-            d["value"],
-            s=dp_to_size(d["std"]),
-            color=COLORS[fanout],
-            marker=MARKERS[fanout],
-            alpha=0.30,
-            linewidths=0,
-            zorder=2,
-        )
+    for idx, row in coverage.iterrows():
+        fanout = int(row["fanout"])
+        load = float(row["load"])
+        n_dps = int(row["n_dps"])
 
-    for fanout in FANOUT_LABELS:
-        d = med.loc[med["fanout"] == fanout]
-        if d.empty:
-            continue
+        d = selected.loc[
+            (selected["fanout"] == fanout)
+            & (selected["load"] == load)
+        ].sort_values("std")
 
+        load_label = f"{load:g}"
         ax.plot(
-            d["load"],
+            d["std"],
             d["value"],
-            color=COLORS[fanout],
-            marker=MARKERS[fanout],
-            linewidth=2.6,
-            markersize=5.5,
-            markeredgewidth=0,
-            zorder=3,
+            color=cmap(idx % 10),
+            marker=MARKERS.get(fanout, "o"),
+            linewidth=2.2,
+            markersize=5.8,
+            markeredgecolor="white",
+            markeredgewidth=0.5,
+            label=f"{fanout} O-RUs, {load_label} MHz ({n_dps} DPs)",
         )
 
-    setup_axis(
-        ax,
-        ylabel="Memória (MB)",
-        ylim=(2800, 4900),
-        ystep=250,
-    )
+    ax.set_xlabel("Desvio padrão da distribuição das cargas (MHz)")
+    ax.set_ylabel("Memória (MB)")
 
-    fanout_legend = fig.legend(
-        handles=fanout_handles(),
-        title="Fanout",
+    xlim = _padded_limits(selected["std"], pad_fraction=0.04, minimum_pad=0.75)
+    ylim = _padded_limits(selected["value"], pad_fraction=0.06, minimum_pad=25.0)
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.xaxis.set_major_locator(MultipleLocator(5))
+    ax.grid(True, alpha=0.22, linewidth=1.0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    ax.legend(
+        title="Fanout e carga agregada",
         loc="upper left",
-        bbox_to_anchor=(0.065, 0.885),
-        ncol=5,
+        bbox_to_anchor=(0.0, 1.22),
+        ncol=2,
         frameon=False,
-        columnspacing=1.9,
+        columnspacing=1.6,
         handlelength=2.2,
         title_fontsize=15,
     )
 
-    dp_refs = [0, 10, 20, 30]
-    size_handles = [
-        ax.scatter(
-            [],
-            [],
-            s=float(dp_to_size(dp)),
-            color="#8f8f8f",
-            alpha=0.55,
-            edgecolors="#707070",
-            linewidths=0.6,
-            label=f"{dp} MHz",
-        )
-        for dp in dp_refs
-    ]
-
-    fig.legend(
-        handles=size_handles,
-        title="DP da composição (tamanho dos pontos)",
-        loc="upper right",
-        bbox_to_anchor=(0.985, 0.885),
-        ncol=4,
-        frameon=False,
-        columnspacing=1.5,
-        handletextpad=0.6,
-        title_fontsize=15,
-    )
-    fig.add_artist(fanout_legend)
-
     fig.text(
-        0.06,
+        0.07,
         0.028,
         "Valores posteriores ao overflow do contador corrigidos com +4.096 MB.",
         ha="left",
         fontsize=12.5,
         color="#555555",
     )
+
+    # Registra no terminal quais séries foram escolhidas, facilitando a
+    # reprodução da figura no texto da dissertação.
+    print("\nSéries selecionadas para o gráfico de memória por DP:")
+    for row in coverage.itertuples(index=False):
+        print(
+            f"  fanout={int(row.fanout)}, carga={row.load:g} MHz, "
+            f"DPs={int(row.n_dps)}, faixa={row.dp_min:g}..{row.dp_max:g} MHz"
+        )
 
     fig.savefig(output, format="pdf", bbox_inches="tight")
     plt.close(fig)

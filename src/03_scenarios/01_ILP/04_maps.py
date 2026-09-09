@@ -428,16 +428,15 @@ if __name__ == "__main__":
     base = pd.read_csv(csv_path)
     ta = pd.read_csv(DIRETORIO_OUT / f"ta_RMB.csv")
     #abrindo o arquivos de clusterização
-    for prefixo in ("ilp_", "grd_"):
-        padrao = f"{prefixo}RMB_*.csv"
-        for arquivo_csv in DIRETORIO_OUT.glob(padrao):
-            #abrindo o arquivo de  clusterização
-            csv_path = arquivo_csv
-            print(f"Carregando o arquivo {csv_path}")
-            clusters = pd.read_csv(csv_path)
-            cadeia = arquivo_csv.stem.split(f"{prefixo}RMB_", 1)[1]
-            clusters = clusters.merge(ta, on="O-DU", how="left", validate="m:1")
-            #Gerando os mapas de clusterização
-            generate_map(base, clusters, output=DIRETORIO_OUT / f"map_{prefixo}RMB_{cadeia}.pdf")
+    padrao = "ilp_RMB_*.csv"
+    for arquivo_csv in DIRETORIO_OUT.glob(padrao):
+        #abrindo o arquivo de  clusterização
+        csv_path = arquivo_csv
+        print(f"Carregando o arquivo {csv_path}")
+        clusters = pd.read_csv(csv_path)
+        cadeia = arquivo_csv.stem.split("ilp_RMB_", 1)[1]
+        clusters = clusters.merge(ta, on="O-DU", how="left", validate="m:1")
+        #Gerando os mapas de clusterização
+        generate_map(base, clusters, output=DIRETORIO_OUT / f"map_ilp_RMB_{cadeia}.pdf")
 
 
