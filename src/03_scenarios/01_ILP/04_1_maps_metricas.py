@@ -1,4 +1,5 @@
-import os
+import math
+import sqlite3
 from pathlib import Path
 
 import contextily as ctx
@@ -11,14 +12,225 @@ from matplotlib.patches import Patch
 from shapely import concave_hull
 from shapely.geometry import LineString, MultiPoint
 from shapely.ops import unary_union
-from common.constantes import DIRETORIO_OUT
 
+from common.constantes import DIRETORIO_OUT, DP_ROUND_DIGITS, clean_metrics_df
+
+
+DB_PATH = DIRETORIO_OUT / "metricas.db"
 BASEMAP_FILE = DIRETORIO_OUT / "basemap_RMB_osm.tif"
+
 FIGSIZE = (7.2, 7.2)
 CONCAVE_HULL_RATIO = 0.35
 CLUSTER_BUFFER_M = 260
 AREA_BUFFER_M = 650
 MAP_PADDING = 0.055
+
+# Métricas existentes na coluna stats.metric e suas assinaturas empíricas.
+METRIC_SPECS = {
+    "cpu": {
+        "metric": "cpu_usage",
+        "usar_dp": False,
+        "label": "CPU",
+        "unit": "%",
+    },
+    "memory": {
+        "metric": "memory_usage",
+        "usar_dp": True,
+        "label": "Memory",
+        "unit": "MB",
+    },
+    "power": {
+        "metric": "cpu_package_power",
+        "usar_dp": False,
+        "label": "Power",
+        "unit": "W",
+    },
+    "minmaxsched": {
+        "metric": "max_scheduler_latency",
+        "usar_dp": False,
+        "label": "Max sched.",
+        "unit": "µs",
+    },
+}
+
+# Quatro mapas para a referência minlink e um mapa para cada cenário
+# especializado, usando a métrica que constitui sua função objetivo.
+MAP_SPECS = [
+    {"scenario": "minlink", "metric_key": "cpu", "output_suffix": "minlink_cpu"},
+    {"scenario": "minlink", "metric_key": "memory", "output_suffix": "minlink_memory"},
+    {"scenario": "minlink", "metric_key": "power", "output_suffix": "minlink_power"},
+    {
+        "scenario": "minlink",
+        "metric_key": "minmaxsched",
+        "output_suffix": "minlink_minmaxsched",
+    },
+    {"scenario": "mincpu", "metric_key": "cpu", "output_suffix": "mincpu"},
+    {"scenario": "minmemory", "metric_key": "memory", "output_suffix": "minmemory"},
+    {"scenario": "minpower", "metric_key": "power", "output_suffix": "minpower"},
+    {
+        "scenario": "minmaxsched",
+        "metric_key": "minmaxsched",
+        "output_suffix": "minmaxsched",
+    },
+]
+
+SCENARIOS = ("minlink", "mincpu", "minmemory", "minpower", "minmaxsched")
+
+
+def load_metrics_dataframe(db_path):
+    """Lê a tabela stats e aplica a limpeza/normalização comum do projeto."""
+    query = """
+        SELECT
+            num_orus,
+            carga_agregada_mhz,
+            dp_carga_mhz,
+            roundtrip,
+            metric,
+            value
+        FROM stats
+    """
+
+    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+        df = pd.read_sql_query(query, connection)
+
+    # Remove potência inválida, corrige overflow de memória e normaliza o DP.
+    df = clean_metrics_df(df)
+    return df
+
+
+def consolidar_custos_metricos(df, metric_name, usar_dp):
+    """
+    Consolida uma métrica na mesma granularidade usada pelos ILPs.
+
+    Primeiro obtém a média das amostras de cada configuração em cada rodada.
+    Para CPU, potência e scheduler, configurações que diferem apenas no DP são
+    consolidadas na assinatura (fanout, carga agregada). Para memória, o DP é
+    mantido e a assinatura é (fanout, carga agregada, DP). Por fim, calcula-se
+    a média entre as rodadas.
+    """
+    stats = df.loc[df["metric"].eq(metric_name)].copy()
+
+    full_key_columns = ["num_orus", "carga_agregada_mhz", "dp_carga_mhz"]
+    per_configuration_round = (
+        stats.groupby(
+            full_key_columns + ["roundtrip", "metric"],
+            as_index=False,
+        )["value"]
+        .mean()
+    )
+
+    if usar_dp:
+        key_columns = full_key_columns
+        per_round = per_configuration_round
+    else:
+        key_columns = ["num_orus", "carga_agregada_mhz"]
+        per_round = (
+            per_configuration_round.groupby(
+                key_columns + ["roundtrip", "metric"],
+                as_index=False,
+            )["value"]
+            .mean()
+        )
+
+    consolidated = (
+        per_round.groupby(key_columns + ["metric"], as_index=False)["value"]
+        .mean()
+        .rename(columns={"value": "custo_empirico"})
+    )
+
+    consolidated["num_orus"] = consolidated["num_orus"].astype(int)
+    consolidated["carga_agregada_mhz"] = (
+        consolidated["carga_agregada_mhz"].astype(int)
+    )
+
+    return consolidated.sort_values(key_columns).reset_index(drop=True)
+
+
+def carregar_custos_por_metrica(df):
+    """Constrói uma tabela de custos empíricos para cada métrica dos mapas."""
+    return {
+        metric_key: consolidar_custos_metricos(
+            df,
+            spec["metric"],
+            usar_dp=spec["usar_dp"],
+        )
+        for metric_key, spec in METRIC_SPECS.items()
+    }
+
+
+def calcular_assinaturas_odus(clusters):
+    """Calcula fanout, carga agregada e DP das cargas de cada O-DU."""
+    signatures = []
+
+    for du, group in clusters.groupby("O-DU", sort=True):
+        loads = group["bandwidth"].astype(float).tolist()
+        num_orus = len(loads)
+        total_load = int(round(sum(loads)))
+        mean_load = total_load / num_orus
+        dp_load = round(
+            math.sqrt(
+                sum((load - mean_load) ** 2 for load in loads) / num_orus
+            ),
+            DP_ROUND_DIGITS,
+        )
+        signatures.append(
+            {
+                "O-DU": int(du),
+                "num_orus": num_orus,
+                "carga_agregada_mhz": total_load,
+                "dp_carga_mhz": dp_load,
+            }
+        )
+
+    return pd.DataFrame(signatures)
+
+
+def estimar_metrica_por_odu(clusters, custos, usar_dp):
+    """Obtém do banco o custo empírico correspondente à assinatura de cada O-DU."""
+    signatures = calcular_assinaturas_odus(clusters)
+
+    if usar_dp:
+        cost_index = {
+            (
+                int(row.num_orus),
+                int(row.carga_agregada_mhz),
+                round(float(row.dp_carga_mhz), DP_ROUND_DIGITS),
+            ): float(row.custo_empirico)
+            for row in custos.itertuples(index=False)
+        }
+    else:
+        cost_index = {
+            (
+                int(row.num_orus),
+                int(row.carga_agregada_mhz),
+            ): float(row.custo_empirico)
+            for row in custos.itertuples(index=False)
+        }
+
+    estimates = {}
+    for row in signatures.itertuples(index=False):
+        signature = (
+            (
+                int(row.num_orus),
+                int(row.carga_agregada_mhz),
+                round(float(row.dp_carga_mhz), DP_ROUND_DIGITS),
+            )
+            if usar_dp
+            else (
+                int(row.num_orus),
+                int(row.carga_agregada_mhz),
+            )
+        )
+        estimates[int(row._0)] = cost_index[signature]
+
+    return estimates
+
+
+def format_metric_value(value, metric_key):
+    """Formata o valor exibido junto ao identificador da O-DU."""
+    spec = METRIC_SPECS[metric_key]
+    return f'{spec["label"]}: {value:.2f} {spec["unit"]}'
+
 
 def create_cluster_boundary(points):
     """Cria o contorno do cluster, inclusive para clusters com poucos pontos."""
@@ -104,6 +316,7 @@ def add_north_arrow(ax):
         zorder=30,
     )
 
+
 def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
     """
     Adiciona uma base cartográfica do OpenStreetMap.
@@ -143,7 +356,7 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
             n_connections=1,
             use_cache=True,
             wait=1,
-            max_retries=2
+            max_retries=2,
         )
 
     print(f"Carregando mapa-base local {basemap_file}")
@@ -155,25 +368,30 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
         alpha=0.48,
         reset_extent=True,
         zorder=0,
-        attribution=False
+        attribution=False,
     )
-    
+
     ctx.add_attribution(
         ax,
         "© OpenStreetMap contributors",
         font_size=6,
     )
 
-def generate_map(base, clusters, output):
+
+def generate_map(base, clusters, estimates, metric_key, output):
     """
-    Gera um mapa PDF de um cenário.
+    Gera um mapa PDF de um cenário, exibindo O-DU_ID e custo empírico.
 
     Parameters
     ----------
     base : pandas.DataFrame
         Base comum com NumEstacao, Lat e Lon.
     clusters : pandas.DataFrame
-        Resultado ILP com NumEstacao, Lat, Lon e O-DU.
+        Resultado ILP com NumEstacao, Lat, Lon, bandwidth, O-DU e O-DU_ID.
+    estimates : dict[int, float]
+        Valor empírico estimado para cada O-DU longa.
+    metric_key : str
+        Chave em METRIC_SPECS usada para rótulo e unidade.
     output : pathlib.Path
         Caminho do PDF de saída.
     """
@@ -307,7 +525,7 @@ def generate_map(base, clusters, output):
                 zorder=6,
             )
 
-        # O-DU identificador.
+        # O-DU e rótulo com identificador sequencial + custo empírico.
         ax.scatter(
             du_point.x,
             du_point.y,
@@ -318,20 +536,28 @@ def generate_map(base, clusters, output):
             linewidth=0.8,
             zorder=10,
         )
+
+        metric_text = format_metric_value(
+            estimates[int(cluster_id)],
+            metric_key,
+        )
+        annotation = f'O-DU {int(du["O-DU_ID"])}\n{metric_text}'
+
         ax.annotate(
-            str(int(du["O-DU_ID"])),
+            annotation,
             xy=(du_point.x, du_point.y),
             xytext=(5, 5),
             textcoords="offset points",
-            fontsize=5.6,
+            fontsize=5.3,
             fontweight="semibold",
+            linespacing=1.05,
             ha="left",
             va="bottom",
             bbox={
-                "boxstyle": "round,pad=0.10",
+                "boxstyle": "round,pad=0.13",
                 "facecolor": "white",
                 "edgecolor": "none",
-                "alpha": 0.82,
+                "alpha": 0.84,
             },
             zorder=12,
         )
@@ -417,26 +643,56 @@ def generate_map(base, clusters, output):
     plt.close(fig)
 
     print(f"Mapa gerado: {output}")
-
     return True
 
 
-if __name__ == "__main__":
-    #abrindo o arquivo com base de dados de RUs e DUs com informações de latitude, longitude e bandwidth
+def main():
+    # Base geográfica comum às cinco soluções.
     csv_path = DIRETORIO_OUT / "grp_RMB.csv"
     print(f"Carregando o arquivo {csv_path}")
     base = pd.read_csv(csv_path)
+
+    # ta_RMB.csv apenas converte o identificador longo da O-DU em O-DU_ID.
     ta = pd.read_csv(DIRETORIO_OUT / "ta_RMB.csv")
-    #abrindo o arquivos de clusterização
-    padrao = "ilp_RMB_*.csv"
-    for arquivo_csv in DIRETORIO_OUT.glob(padrao):
-        #abrindo o arquivo de  clusterização
-        csv_path = arquivo_csv
-        print(f"Carregando o arquivo {csv_path}")
-        clusters = pd.read_csv(csv_path)
-        cadeia = arquivo_csv.stem.split("ilp_RMB_", 1)[1]
+
+    print(f"Carregando métricas empíricas de {DB_PATH}")
+    metrics_df = load_metrics_dataframe(DB_PATH)
+    costs_by_metric = carregar_custos_por_metrica(metrics_df)
+
+    # Lê exatamente os cinco cenários utilizados no estudo.
+    clusters_by_scenario = {}
+    for scenario in SCENARIOS:
+        scenario_path = DIRETORIO_OUT / f"ilp_RMB_{scenario}.csv"
+        print(f"Carregando o arquivo {scenario_path}")
+        clusters = pd.read_csv(scenario_path)
         clusters = clusters.merge(ta, on="O-DU", how="left", validate="m:1")
-        #Gerando os mapas de clusterização
-        generate_map(base, clusters, output=DIRETORIO_OUT / f"map_ilp_RMB_{cadeia}.pdf")
+        clusters_by_scenario[scenario] = clusters
+
+    # Gera os quatro mapas de referência e os quatro mapas especializados.
+    for map_spec in MAP_SPECS:
+        scenario = map_spec["scenario"]
+        metric_key = map_spec["metric_key"]
+        metric_spec = METRIC_SPECS[metric_key]
+        clusters = clusters_by_scenario[scenario]
+
+        estimates = estimar_metrica_por_odu(
+            clusters,
+            costs_by_metric[metric_key],
+            usar_dp=metric_spec["usar_dp"],
+        )
+
+        output = (
+            DIRETORIO_OUT
+            / f'map_ilp_metric_RMB_{map_spec["output_suffix"]}.pdf'
+        )
+        generate_map(
+            base=base,
+            clusters=clusters,
+            estimates=estimates,
+            metric_key=metric_key,
+            output=output,
+        )
 
 
+if __name__ == "__main__":
+    main()
