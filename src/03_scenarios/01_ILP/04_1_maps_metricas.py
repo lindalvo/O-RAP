@@ -36,19 +36,19 @@ METRIC_SPECS = {
     "memory": {
         "metric": "memory_usage",
         "usar_dp": True,
-        "label": "Memory",
-        "unit": "MB",
+        "label": "mem",
+        "unit": "GB",
     },
     "power": {
         "metric": "cpu_package_power",
         "usar_dp": False,
-        "label": "Power",
+        "label": "⚡",
         "unit": "W",
     },
     "minmaxsched": {
         "metric": "max_scheduler_latency",
         "usar_dp": False,
-        "label": "Max sched.",
+        "label": "⌛",
         "unit": "µs",
     },
 }
@@ -73,9 +73,6 @@ MAP_SPECS = [
         "output_suffix": "minmaxsched",
     },
 ]
-
-SCENARIOS = ("minlink", "mincpu", "minmemory", "minpower", "minmaxsched")
-
 
 def load_metrics_dataframe(db_path):
     """Lê a tabela stats e aplica a limpeza/normalização comum do projeto."""
@@ -229,6 +226,8 @@ def estimar_metrica_por_odu(clusters, custos, usar_dp):
 def format_metric_value(value, metric_key):
     """Formata o valor exibido junto ao identificador da O-DU."""
     spec = METRIC_SPECS[metric_key]
+    if spec["metric"] == "memory_usage":
+        value /= 1024
     return f'{spec["label"]}: {value:.2f} {spec["unit"]}'
 
 
@@ -365,7 +364,7 @@ def add_openstreetmap_basemap(ax, base_geo, metric_crs, basemap_file):
         ax,
         crs=metric_crs,
         source=basemap_file,
-        alpha=0.48,
+        alpha=0.30,
         reset_extent=True,
         zorder=0,
         attribution=False,
@@ -661,10 +660,11 @@ def main():
 
     # Lê exatamente os cinco cenários utilizados no estudo.
     clusters_by_scenario = {}
-    for scenario in SCENARIOS:
-        scenario_path = DIRETORIO_OUT / f"ilp_RMB_{scenario}.csv"
-        print(f"Carregando o arquivo {scenario_path}")
-        clusters = pd.read_csv(scenario_path)
+    padrao = "ilp_RMB_*.csv"
+    for arquivo_csv in sorted(DIRETORIO_OUT.glob(padrao)):
+        scenario = arquivo_csv.stem.split("ilp_RMB_", 1)[1]
+        print(f"Carregando o arquivo {arquivo_csv}")
+        clusters = pd.read_csv(arquivo_csv)
         clusters = clusters.merge(ta, on="O-DU", how="left", validate="m:1")
         clusters_by_scenario[scenario] = clusters
 
